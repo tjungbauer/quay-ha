@@ -1,0 +1,83 @@
+# Prepare Database for Quay and install required extension
+- name: Connect to Patroni RestAPI
+  uri:
+    url: http://localhost:8008/cluster
+    method: GET
+    return_content: yes
+    status_code: 200
+    body_format: json
+  register: data
+  run_once: true
+
+- name: DEBUG - analyze returned Patroni json and find current leader
+  debug:
+    msg: "{{ data.json.members|json_query(query) }}"
+  register: leader
+  vars:
+    role: "leader"
+    query: "[?role=='{{ role }}'].name"
+  run_once: true
+
+# leader.msg is return as list, but there should be only one element ... so [0] should work
+- name: Set current DB leader
+  set_fact:
+    leader_node: "{{ leader.msg[0] }}"
+  run_once: true
+
+- name: "Delegated - Create a new database {{ quay_db }}"
+  delegate_to: "{{ leader_node }}"
+  postgresql_db:
+    name: "{{ quay_db }}"
+    state: present
+  run_once: true
+
+- name: "Delegated - Create {{ quay_db_user }} user"
+  delegate_to: "{{ leader_node }}"
+  postgresql_user:
+    db: "{{ quay_db }}"
+    name: "{{ quay_db_user }}"
+    password: "{{ quay_db_pass }}"
+    priv: "ALL"
+    expires: "infinity"
+  run_once: true
+
+- name: Add pg_trgm extension to Postgres
+  delegate_to: "{{ leader_node }}"
+  shell: |
+    bash -c "echo \"CREATE EXTENSION IF NOT EXISTS pg_trgm;\" | psql -U postgres -d {{ quay_db }}"
+  run_once: true
+  register: extension
+  changed_when: '"skipping" not in extension.stdout'
+
+# Install required packages, create folders for quay and authenticate at quay.io
+- name: Install Podman and pip
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - podman
+    - podman-docker
+    - python3-pip
+
+- name: "Create quay config and storage directories"
+  file:
+    state: directory
+    path: "{{ item }}"
+    mode: 0777
+    recurse: yes
+  loop:
+    - "{{ quay_config_path }}/config"
+    - "{{ quay_config_path }}/storage"
+    - "{{ clair_config_path }}"
+
+- name: Login to quay.io - WORKAROUND
+  shell:
+    cmd: podman login -u "redhat+quay" -p "{{ quayio_pass }}" quay.io
+
+- name: Pull Quay - This may take a while
+  shell:
+    cmd: podman pull quay.io/redhat/quay:{{ quay_version }}
+
+- name: Pull Clair - This may take a while
+  shell: 
+    cmd: podman pull quay.io/redhat/clair-jwt:{{ clair_version }}

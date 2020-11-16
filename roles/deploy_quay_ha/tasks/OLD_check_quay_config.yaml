@@ -1,0 +1,99 @@
+- name: Get existing config
+  block:
+  - name: Set variable for old config
+    set_fact: 
+      old_config_present: true
+
+  # Existing/old config
+  - name: Fetch the backup file locally
+    fetch:
+      src: "{{ quay_config_path }}/quay-config.tar.gz"
+      dest: "{{ playbook_dir }}/.tmp/"
+      flat: yes
+    delegate_to: "{{ groups['quay_config'][0] }}"
+
+#  - name: create tmp backupfolder
+#    file:
+#      path: "{{ playbook_dir }}/.tmp/quay_check_config"
+#      state: directory
+#      mode: '0755'
+
+  - name: Uncompress Quay config backup
+    unarchive:
+      src: "{{ playbook_dir }}/.tmp/quay-config.tar.gz"
+      dest: "{{ playbook_dir }}/.tmp/quay_check_config"
+
+  - name: Stat ssl.key
+    stat: 
+      path: "{{ playbook_dir }}/.tmp/quay_check_config/ssl.key"
+    register: old_ssl_key
+
+  - name: Stat ssl.cert
+    stat: 
+      path: "{{ playbook_dir }}/.tmp/quay_check_config/ssl.cert"
+    register: old_ssl_cert
+
+  - name: Stat ca.crt
+    stat: 
+      path: "{{ playbook_dir }}/.tmp/quay_check_config/ca.crt"
+    register: old_ca_crt
+
+  # replace generated uuid in config.yaml with a defined string - "random-uuid"
+  - name: Replace generated uuid
+    lineinfile:
+      regexp: "^{{ item }}"
+      path: "{{ playbook_dir }}/.tmp/quay_check_config/config.yaml"
+      line: "{{ item }}: '0'"
+    loop:
+    - DATABASE_SECRET_KEY
+    - BITTORRENT_FILENAME_PEPPER
+    - SECRET_KEY
+
+  - name: Stat config.yaml
+    stat: 
+      path: "{{ playbook_dir }}/.tmp/quay_check_config/config.yaml"
+    register: old_config_yaml
+
+  # New/Current config
+  - name: Template current config
+    template:
+      src: quay-config.yaml.j2
+      dest: "{{ playbook_dir }}/.tmp/quay_check_config/config-new.yaml"
+    register: new_config_yaml
+
+  - name: Stat current ssl.key
+    stat: 
+      path: "{{ quay_ssl_key }}"
+    register: new_ssl_key
+    when: quay_ssl_key is defined
+
+  - name: Stat current ssl.cert
+    stat: 
+      path: "{{ quay_ssl_cert }}"
+    register: new_ssl_cert
+
+    when: quay_ssl_cert is defined
+  - name: Stat current ca.crt
+    stat: 
+      path: "{{ quay_ca_bundle }}"
+    register: new_ca_crt
+    when: quay_ca_bundle is defined
+
+  rescue:
+  - set_fact:
+      old_config_present: false
+  delegate_to: 127.0.0.1
+  run_once: true
+
+# Current config
+- name: Run Quay Config Container and update configuration
+  include_tasks: quay_configuration.yaml
+  when: not old_config_present or old_config_yaml.stat.checksum != new_config_yaml.checksum
+    #or (new_ssl_cert is defined and old_ssl_cert is not defined) 
+    #or (new_ssl_cert is defined and old_ssl_cert is defined and new_ssl_cert.stat.checksum != old_ssl_cert.stat.cheksum) 
+    #or (new_ssl_key is defined and old_ssl_key is not defined) 
+    #or (new_ssl_key is defined and old_ssl_key is defined and new_ssl_key.stat.checksum != old_ssl_key.stat.cheksum) 
+    #or (new_ca_bundle is defined and old_ca_bundle is not defined) 
+    #or (new_ca_bundle is defined and old_ca_bundle is defined and new_ca_bundle.stat.checksum != old_ca_bundle.stat.cheksum) 
+  run_once: false
+

@@ -1,0 +1,15 @@
+[Unit]
+Description=Quay Worker
+
+[Service]
+Restart=on-failure
+ExecStartPre=/usr/bin/rm -f /%t/%n-pid /%t/%n-cid
+ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid -d --name worker-quay -v {{ quay_config_path }}:/conf/stack:Z quay.io/redhat/quay:{{ quay_version }} repomirror
+ExecStop=/usr/bin/sh -c "/usr/bin/podman rm -f `cat /%t/%n-cid`"
+KillMode=none
+Type=forking
+PIDFile=/%t/%n-pid
+
+[Install]
+WantedBy=multi-user.target
+

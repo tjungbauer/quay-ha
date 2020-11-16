@@ -1,0 +1,8 @@
+- name: "Delegated - Create replication user"
+  postgresql_user:
+    name: "{{ postgres_replication_username }}"
+    password: "{{ postgres_replication_password }}"
+    role_attr_flags: "REPLICATION"
+    expires: "infinity"
+    db: "postgres"
+  ignore_errors: yes

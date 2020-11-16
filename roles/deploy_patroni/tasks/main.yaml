@@ -1,0 +1,16 @@
+- include_tasks: install_postgres.yaml
+  tags:
+    - packages
+    - ignore_dbcluster
+
+- include_tasks: install_patroni.yaml
+  tags:
+    - postgres_install
+    - patroni_install
+    - patroni
+    - ignore_dbcluster
+
+#- include_tasks: last_chance.yaml
+#  tags:
+#    - ignore_dbcluster
+#    - last_chance

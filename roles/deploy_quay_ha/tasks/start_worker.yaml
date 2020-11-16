@@ -1,0 +1,13 @@
+- name: Copy Quay Worker systemd file
+  template:
+    src: systemd/quay_worker.service.j2
+    dest: /etc/systemd/system/worker-quay.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Start Quay Worker service
+  systemd:
+    name: worker-quay.service
+    daemon_reload: yes
+    enabled: yes

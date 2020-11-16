@@ -1,0 +1,50 @@
+- name: Install Base Packages
+  package:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+  with_items:
+    - "{{ base_packages }}"
+  tags:
+    - packages
+    - ignore_quay
+
+- include_tasks: prepare_quay.yaml
+  tags:
+    - prepare_quay
+    - ignore_quay
+
+- include_tasks: start_redis.yaml
+  tags:
+    - start_redis
+    - redis
+    - ignore_quay
+
+#- include_tasks: check_quay_config.yaml
+#  tags:
+#    - start_quay_config
+#    - quay_config
+#    - ignore_quay
+
+- include_tasks: quay_configuration.yaml
+  tags:
+    - start_quay_config
+    - quay_config
+    - ignore_quay
+
+- include_tasks: start_quay.yaml
+  tags:
+    - start_quay
+    - quay
+    - ignore_quay
+
+- include_tasks: start_clair.yaml
+  tags:
+    - start_clair
+    - clair
+    - ignore_quay
+
+- include_tasks: start_worker.yaml
+  tags:
+    - start_quay_worker
+    - quay-worker
+    - ignore_quay

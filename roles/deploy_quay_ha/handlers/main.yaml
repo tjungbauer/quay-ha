@@ -1,0 +1,28 @@
+# Patroni
+- name: restart patroni
+  systemd:
+    name: patroni.service
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+
+# handlers file for etcd-cluster
+
+# Restart masters one-by-one to keep quorum
+- name: restart etcd masters
+  when: etcd_launch | bool
+  service:
+    name: etcd
+    state: restarted
+  run_once: yes
+  loop: '{{ groups[etcd_master_group_name] }}'
+  delegate_to: '{{ item }}'
+
+# Restart non-voting members
+- name: restart etcd members
+  when:
+  - etcd_launch | bool
+  - inventory_hostname is not in (groups[etcd_master_group_name])
+  service:
+    name: etcd
+    state: restarted

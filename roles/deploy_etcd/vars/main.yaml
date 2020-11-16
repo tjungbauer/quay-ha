@@ -1,0 +1,43 @@
+---
+######################
+#   etcd settings    #
+######################
+
+etcd_cluster_name: etcd.cluster
+etcd_initial_cluster_token: 32255c24-1706-5eb7-8e14-59ccc89e20b5
+etcd_master_group_name: etcd_master
+
+etcd_secure: True
+etcd_port_client: 2379
+etcd_port_peer: 2380
+
+# Certificate for the server to server communication
+#etcd_ssl:
+#    # Certificate file
+#  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/etcd0.example.com.crt"
+#    mode: '0600'
+#    dst: "etcd0.example.com.crt"
+#    # Certificate KEY file
+#  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/private/etcd0.example.com.key"
+#    mode: '0400'
+#    dst: "etcd0.example.com.key"
+#    # CA file
+#  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/ca.crt"
+#    dst: "ca.crt"
+#    mode: '0600'
+
+# Certificate for client to server communication. 
+#etcd_client_cert:
+#    # Certificate file
+#  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/etcd-client.crt"
+#    mode: '0600'
+#    dst: "etcd-client.crt"
+#    # Certificate KEY file
+#  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/private/etcd-client.key"
+#    mode: '0400'
+#    dst: "etcd-client.key"
+#    # CA file
+#  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/ca.crt"
+#    dst: "ca.crt"
+#    mode: '0600'
+

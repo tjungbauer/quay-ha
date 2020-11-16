@@ -1,0 +1,63 @@
+
+etc_hosts_path: /etc/hosts
+etc_hosts_add_extra_entries: False
+
+# User and Group for MinIO
+minio_user: minio
+minio_group: minio
+
+# Download URLs
+minio_server_download_url: "https://dl.min.io/server/minio/release/linux-amd64/"
+minio_client_download_url: "https://dl.min.io/client/mc/release/linux-amd64/"
+
+# Path to the file containing the ENV variables for the Minio server
+#minio_server_envfile: /etc/default/minio
+minio_server_envfile: /etc/minio
+
+# Minio binaries path
+minio_server_bin: /usr/local/bin/minio
+minio_client_bin: /usr/local/bin/mc
+
+# Minio server listen address
+minio_server_addr: ":9000"
+
+# Minio server cluster node list.
+# Should be IP/hostname from to or space separated
+# 3 dots 1...4 -> is correct to avoid confusion with shell 
+# if TLS is used, the protocol must be https
+minio_server_cluster_nodes:
+  - "http://10.0.0.{4...7}/export{1...4}"
+
+# Additional environment variables to be set in minio server environment
+minio_server_env_extra: ""
+minio_tls: false
+minio_certs_dir: '/home/minio/.minio/certs'
+
+# Minio Certificates
+minio_certs:
+  - src: "{{ minio_ssl_crt }}"
+    dst: "{{ minio_certs_dir }}/public.crt"
+    mode: '0600'
+  - src: "{{ minio_ssl_key }}"
+    dst: "{{ minio_certs_dir }}/private.key"
+    mode: '0400'
+
+minio_ca:
+  - src: "{{ minio_ssl_ca }}"
+    dst: "{{ minio_certs_dir }}/CAs/public.crt"
+    mode: '0600'
+
+# Additional Minio server CLI options
+minio_server_opts: "--certs-dir {{ minio_certs_dir }}"
+
+# Minio access and secret keys
+minio_access_key: "minioadmin"
+minio_secret_key: "miniopass.$"
+
+# data directories:
+minio_server_datadirs: 
+  - /export1
+  - /export2
+  - /export3
+  - /export4
+minio_server_make_datadirs: true

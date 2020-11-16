@@ -1,0 +1,123 @@
+
+base_domain: ispworld.at
+use_local_files: true
+
+etc_hosts_add_extra_entries: True
+etc_hosts_extra_entries:
+  - ip: 192.168.101.4
+    hostnames: 'minio01.ispworld.at minio01'
+  - ip: 192.168.101.5
+    hostnames: 'minio02.ispworld.at minio02'
+  - ip: 192.168.101.6
+    hostnames: 'minio03.ispworld.at minio03'
+
+######################
+#     Patroni DB     #
+######################
+postgres_replication_username: "replication"
+
+######################
+#       MinIO        #
+######################
+minio_access_key: minioadmin
+minio_server_cluster_nodes:
+  - "https://minio01.ispworld.at:9000/export{1...4}"
+  - "https://minio02.ispworld.at:9000/export{1...4}"
+  - "https://minio03.ispworld.at:9000/export{1...4}"
+  #- "https://192.168.101.{4...6}/export{1...4}"
+minio_tls: true
+minio_hostname: "minio.{{ base_domain }}"
+minio_ssl_crt: "{{ playbook_dir }}/files/minio-certs/fullchain.pem"
+minio_ssl_key: "{{ playbook_dir }}/files/minio-certs/privkey.pem"
+
+minio_server_datadirs:
+  - /export1
+  - /export2
+  - /export3
+  - /export4
+minio_server_make_datadirs: true
+minio_initial_bucket: "quay"
+
+######################
+#    Quay Storage    #
+######################
+#quay_datastore: rados
+#quay_rados_access_key: "{{ minio_access_key }}"
+#quay_rados_bucket_name: quay
+#quay_rados_hostname: "{{ minio_hostname }}"
+#quay_rados_is_secure: true
+#quay_rados_port: 9000
+#quay_rados_secret_key: "{{ minio_secret_key }}"
+#quay_rados_storage_path: /datastorage/registry
+
+######################
+#   Quay Deployment  #
+######################
+quay_hostname: quay.{{ base_domain }}
+quay_version: v3.3.1
+clair_version: v3.3.1
+quay_db_host: 192.168.100.1 # cluster VIP
+
+# Define SSL certs for Quay
+quay_ssl_cert: "{{ playbook_dir }}/files/ssl.cert"
+quay_ssl_key: "{{ playbook_dir }}/files/ssl.key"
+
+# Define ca bundle if any. If not, leave empty
+#quay_ca_bundle: "{{ playbook_dir }}files/ca.crt"
+
+######################
+#       Redis        #
+######################
+quay_redis_host: "192.168.100.1"
+
+######################
+#        Clair       #
+######################
+clair_url: http://192.168.100.1:6060
+clair_db_host: 192.168.100.1
+clair_ssl_cert: "{{ playbook_dir }}/files/ssl.cert"
+clair_ssl_key: "{{ playbook_dir }}/files/ssl.key"
+
+######################
+# Patroni Deployment #
+######################
+db_network: "192.168.100.0/24"
+patroni_etcd_hosts: 192.168.100.4:2379,192.168.100.5:2379,192.168.100.6:2379
+
+######################
+#   etcd settings    #
+######################
+etcd_cluster_name: etcd.cluster
+etcd_initial_cluster_token: 32255c24-1706-5eb7-8e14-59ccc89e20b5
+etcd_master_group_name: etcd_master
+etcd_secure: True
+
+# Certificate for the server to server communication
+etcd_ssl:
+  # Certificate file
+  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/etcd0.example.com.crt"
+    mode: '0600'
+    dst: "etcd0.example.com.crt"
+  # Certificate KEY file
+  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/private/etcd0.example.com.key"
+    mode: '0400'
+    dst: "etcd0.example.com.key"
+  # CA file
+  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/ca.crt"
+    dst: "ca.crt"
+    mode: '0600'
+  
+# Certificate for client to server communication.
+etcd_client_cert:
+  # Certificate file
+  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/etcd-client.crt"
+    mode: '0600'
+    dst: "etcd-client.crt"
+  # Certificate KEY file
+  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/private/etcd-client.key"
+    mode: '0400'
+    dst: "etcd-client.key"
+  # CA file
+  - src: "{{ playbook_dir }}/files/etcd-certs/etcd-ca/certs/ca.crt"
+    dst: "ca.crt"
+    mode: '0600'

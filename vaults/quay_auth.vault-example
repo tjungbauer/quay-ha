@@ -1,0 +1,23 @@
+ # Quay.io Registry
+ quayio_pass: <Password to authenticate at Quay.io>
+
+ # Quay Database password
+ quay_db_pass: <database password for Quay>
+
+ # Quay Password for config UI
+ quay_config_pass: <Password for Quay Config>
+
+ # Quay Superuser
+ quay_superuser: <Quay Superusername>
+ quay_superuser_password: <Quay Superuser Password> # MUST be at least 8 chars long
+ quay_superuser_email: <Quay Superuser Email>
+
+ # Clair Database Password
+ clair_db_pass: <Clair database password>
+
+ # Minio KEY
+ minio_secret_key: "<minio password>" # must be 8 chars minimum
+
+ # Patroni DB
+ postgres_superuser_password: "<superuser password>"
+ postgres_replication_password: "<password for replication user>"

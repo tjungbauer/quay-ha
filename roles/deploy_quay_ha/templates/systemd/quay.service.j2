@@ -1,0 +1,15 @@
+[Unit]
+Description=Quay
+
+[Service]
+Restart=on-failure
+ExecStartPre=/usr/bin/rm -f /%t/%n-pid /%t/%n-cid
+ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid --name=quay --privileged=true -v {{ quay_config_path }}/config:/conf/stack:Z  -v {{ quay_config_path }}/storage:/datastorage:Z  -p 443:8443 -p 80:8080 --sysctl net.core.somaxconn=4096 -d quay.io/redhat/quay:{{ quay_version }}
+ExecStop=/usr/bin/sh -c "/usr/bin/podman rm -f `cat /%t/%n-cid`"
+KillMode=none
+Type=forking
+PIDFile=/%t/%n-pid
+
+[Install]
+WantedBy=multi-user.target
+

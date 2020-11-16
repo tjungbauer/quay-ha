@@ -1,0 +1,12 @@
+---
+############################
+# Quay Default Settings
+############################
+
+quay_config_path: /mnt/quay
+clair_config_path: /mnt/clair
+quay_version: v3.3.1
+clair_version: v3.3.1
+
+quay_datastore: 
+

@@ -1,0 +1,36 @@
+- name: Create Redis folder
+  file:
+    state: directory
+    path: "/var/lib/redis"
+    mode: 0777
+    owner: root
+    group: root
+
+#- name: Start Redis Cache
+#  containers.podman.podman_container:
+#    detach: yes
+#    name: "redis"
+#    privileged: yes
+#    state: started
+#    publish:
+#      - "6379:6379"
+#    image: "registry.access.redhat.com/rhscl/redis-32-rhel7"
+#    volume:
+#      - "/var/lib/redis:/var/lib/redis/data:Z"
+
+- name: Copy REDIS systemd file
+  template:
+    src: systemd/redis.service.j2
+    dest: /etc/systemd/system/redis.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Start Redis service
+  systemd:
+   name: redis.service
+   state: restarted
+   daemon_reload: yes
+   enabled: yes
+
+

@@ -1,0 +1,208 @@
+---
+- name: "Get the Minio server checksum"
+  set_fact:
+    minio_server_checksum: "{{ lookup('url', minio_server_download_url + 'minio.sha256sum').split(' ')[0] }}"
+  when: not use_local_files | bool
+
+- name: "Get the Minio client checksum for"
+  set_fact:
+    minio_client_checksum: "{{ lookup('url', minio_client_download_url + '/mc.sha256sum').split(' ')[0] }}"
+  when: not use_local_files | bool
+
+- name: Create Minio group
+  group:
+    name: "{{ minio_group }}"
+    state: present
+
+- name: Create Minio user
+  user:
+    name: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    system: "yes"
+    shell: "/usr/sbin/nologin"
+
+- name: Create the MinIO data storage folder
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: '0750'
+  when: minio_server_make_datadirs | bool
+  with_items: "{{ minio_server_datadirs }}"
+
+- name: Download the Minio server binaries and compare checksum
+  get_url:
+    url: "{{ minio_server_download_url }}/minio"
+    dest: "{{ minio_server_bin }}"
+    owner: "root"
+    group: "root"
+    mode: '0755'
+    checksum: "sha256:{{ minio_server_checksum }}"
+  register: download_server
+  until: download_server is succeeded
+  retries: 5
+  delay: 2
+  when: not use_local_files | bool
+
+- name: Download the Minio client
+  get_url:
+    url: "{{ minio_client_download_url }}/mc"
+    dest: "{{ minio_client_bin }}"
+    owner: "root"
+    group: "root"
+    mode: 0755
+    checksum: "sha256:{{ minio_client_checksum }}"
+  register: download_client
+  until: download_client is succeeded
+  retries: 5
+  delay: 2
+  when: not use_local_files | bool
+
+- name: COPY mc binary from files folder
+  copy:
+    src: "mc"
+    dest: "{{ minio_client_bin }}"
+    owner: "root"
+    group: "root"
+    mode: 0755
+  when: use_local_files | bool
+
+- name: COPY minio binary from files folder
+  copy:
+    src: "minio"
+    dest: "{{ minio_server_bin }}"
+    owner: "root"
+    group: "root"
+    mode: 0755
+  when: use_local_files | bool
+
+- name: Create SSL directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: 0755
+  loop:
+    - "{{ minio_certs_dir }}"
+    - "{{ minio_certs_dir }}/CAs"
+  when: minio_tls | bool
+
+- name: Configure CA cert
+  block:
+    - name: Check SSL CA cert
+      local_action:
+        module: stat
+        path: "{{ minio_ssl_ca }}"
+      register: ca_file_stat
+ 
+    - name: Assert SSL cert present
+      assert:
+        that:
+          - ca_file_stat.exists
+
+    - name: copy CA if available
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dst }}"
+        owner: "{{ minio_user }}"
+        group: "{{ minio_group }}"
+        mode: "{{ item.mode }}"
+      with_items:
+        - "{{ minio_ca }}"
+      when: minio_tls | bool and ca_file_stat | bool
+  when:
+   - minio_ssl_ca is defined
+
+- name: Copy certificates
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dst }}"
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: "{{ item.mode }}"
+  with_items:
+    - "{{ minio_certs }}"
+  when: minio_tls | bool
+  notify: restart minio
+
+- name: Be sure that no certificates are available when no TLS is used
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ minio_certs_dir }}"
+  when: not minio_tls | bool
+  notify: restart minio
+
+- name: Generate the Minio server envfile
+  template:
+    src: minio.env.j2
+    dest: "{{ minio_server_envfile }}"
+    owner: "root"
+    group: "{{ minio_group }}"
+    mode: 0640
+  notify: restart minio
+
+- name: Create the Minio server systemd config
+  template:
+    src: minio.service.j2
+    dest: "/etc/systemd/system/minio.service"
+    owner: "root"
+    group: "root"
+  when: ansible_service_mgr == "systemd"
+
+- name: Reload MinIO systemd
+  systemd:
+    name: minio
+    daemon_reload: true
+
+- name: Enable and start the Minio service
+  service:
+    name: minio
+    state: restarted
+    enabled: true
+
+- name: "Set fact"
+  set_fact:
+    minio_proto: "https"
+  when: minio_tls | bool
+
+- name: "Set fact"
+  set_fact:
+    minio_proto: "http"
+  when: not minio_tls | bool
+
+- name: Wait until MinIO cluster is available
+  uri:
+    url: "{{ minio_proto }}://{{ item }}:9000/minio/health/live"
+    method: GET
+    validate_certs: no
+    status_code: [200]
+  register: result
+  until: result.status == 200
+  retries: 10
+  delay: 30
+  loop:
+    - "{{ ansible_host }}"
+
+- name: Remove example connections from .mc/config.json
+  shell:
+    cmd: mc alias rm {{ item }}
+  loop:
+    - local
+    - gcs
+    - play
+    - s3
+
+- name: Add connection to local minio
+  shell:
+    cmd: mc alias set quayminio {{ minio_proto }}://{{ ansible_hostname }}.{{ base_domain }}:9000 {{ minio_access_key }} {{ minio_secret_key }}
+
+- name: Create Initial Buckets - on one node only
+  delegate_to: "{{ groups['minio'][0] }}"
+  shell:
+    cmd: "mc mb quayminio/{{ minio_initial_bucket }}"
+  run_once: yes
+

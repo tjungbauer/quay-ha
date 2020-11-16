@@ -1,0 +1,24 @@
+[psql]
+psql01 ansible_host=192.168.100.4
+psql02 ansible_host=192.168.100.5
+psql03 ansible_host=192.168.100.6
+psql04 ansible_host=192.168.100.7
+
+[etcd_master]
+psql01
+psql02
+psql03
+
+[etcd]
+psql01
+psql02
+psql03
+
+[quay_config]
+psql01
+
+[minio]
+minio01 ansible_host=192.168.101.4
+minio02 ansible_host=192.168.101.5
+minio03 ansible_host=192.168.101.6
+#minio04 ansible_host=192.168.101.7

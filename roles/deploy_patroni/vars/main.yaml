@@ -1,0 +1,24 @@
+---
+######################
+# Patroni Deployment #
+######################
+#db_network: "10.0.0.0/24"
+#patroni_etcd_hosts: 10.0.0.4.4:2379,10.0.0.5:2379,10.0.0.6:2379
+
+# If false, then PostGres 10 (default RHEL8 package) will be installed
+psql_custom: true
+psql_version: '12' # leave EMPTY when you want to install default Postgres 10 !!!
+psql_repo: 'https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm'
+patroni_repo: 'https://github.com/cybertec-postgresql/patroni-packaging/releases/download/1.6.5-1/patroni-1.6.5-1.rhel7.x86_64.rpm'
+
+psql_packages:
+  - name: postgresql{{psql_version}}-server
+    state: present
+  - name: postgresql{{psql_version}}
+    state: present
+  - name:  postgresql{{psql_version}}-devel
+    state: present
+  - name: python3-psycopg2
+    state: present
+  - name: postgresql{{psql_version}}-contrib
+    state: present

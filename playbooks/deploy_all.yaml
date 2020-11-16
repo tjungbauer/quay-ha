@@ -1,0 +1,75 @@
+---
+- name: Prepare node
+  gather_facts: yes
+  hosts: all
+
+  tasks:
+    - name: Enable EPEL
+      dnf:
+        name: 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm'
+        state: present
+        disable_gpg_check: yes
+      when: not use_local_files|bool
+      tags:
+        - packages
+ 
+    - name: Install EPEL package if repository is enabled
+      package:
+        name:
+          - epel-release
+        state: present
+      when: not use_local_files|bool
+      tags:
+        - packages
+
+    - name: Install base packages for your convinience
+      package:
+        name:
+          - vim
+          - wget
+          - jq
+        state: present
+      tags:
+        - packages
+
+- name: Configure MinIO environment
+  gather_facts: yes
+  hosts:
+    - minio
+  vars_files:
+    - ../vaults/quay_auth.vault
+  roles:
+    - deploy_minio
+
+- name: Deploy ETCD cluster
+  gather_facts: yes
+  hosts:
+    - etcd
+  vars_files:
+    - ../vaults/quay_auth.vault
+  roles:
+    - deploy_etcd
+
+- name: configuring lab environment for Postgres Cluster
+  gather_facts: yes
+  hosts:
+    - psql
+  vars_files:
+    - ../vaults/quay_auth.vault
+  roles:
+    - deploy_patroni
+
+- name: Pause for 60 seconds since Patroni just started
+  pause:
+    seconds: 60
+
+- name: configuring lab environment for Quay HA
+  gather_facts: yes
+  hosts:
+    - psql
+  vars_files:
+    - ../vaults/quay_auth.vault
+  collections:
+    - community.general.docker_login
+  roles:
+    - deploy_quay_ha

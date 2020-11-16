@@ -1,0 +1,421 @@
+- name: Start Quay Configuration Container
+  delegate_to: "{{ groups['quay_config'][0] }}"
+  run_once: true
+  containers.podman.podman_container:
+    detach: yes
+    #force_restart: yes
+    state: started
+    name: "quay-config"
+    privileged: yes
+    publish:
+      - "8443:8443"
+    image: "quay.io/redhat/quay:{{ quay_version }}"
+    command: "config {{ quay_config_pass }}"
+  register: quay_config_started
+
+- name: Copy Quay-Config systemd file - but do not let it start during boot
+  template:
+    src: systemd/quay-config.service.j2
+    dest: /etc/systemd/system/quay-config.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Reload SystemD Daemon
+  systemd:
+    name: quay-config.service
+    daemon_reload: yes
+    enabled: yes
+
+- name: Wait for Quay config container to start
+  wait_for:
+    port: "8443"
+    host: "{{ groups['quay_config'][0] }}"
+    delay: 10
+    timeout: 60
+  when: quay_config_started is changed
+  run_once: true
+
+- name: Check config status - config-db should be returned
+  local_action:
+    module: uri
+    url: "{{ quay_config_url }}/api/v1/superuser/registrystatus"
+    user: quayconfig
+    password: "{{ quay_config_pass }}"
+    method: GET
+    validate_certs: no
+    force_basic_auth: yes
+  register: quay_reg_status
+  run_once: true
+
+- name: Configure Quay DB
+  block:
+  - name: Validate DB connection
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/config/validate/database"
+      method: POST
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      force_basic_auth: yes
+      body_format: json
+      body: >-
+        {
+          "config": {
+            "DB_URI": "postgresql://{{ quay_db_user }}:{{ quay_db_pass }}@{{ quay_db_host }}:{{ quay_db_port | default('5432') }}/{{ quay_db }}"
+          }
+        }
+  
+  - name: Add DB connection URL to configuration
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/config"
+      method: PUT
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      force_basic_auth: yes
+      body_format: json
+      body: >-
+        {
+          "config": {
+            "DB_URI": "postgresql://{{ quay_db_user }}:{{ quay_db_pass }}@{{ quay_db_host }}:{{ quay_db_port | default('5432') }}/{{ quay_db }}"
+          }
+        }
+  when: quay_reg_status.json.status == "config-db"
+  run_once: true
+
+- name: Check config status - should return setup-db now
+  local_action:
+    module: uri
+    url: "{{ quay_config_url }}/api/v1/superuser/registrystatus"
+    user: quayconfig
+    password: "{{ quay_config_pass }}"
+    method: GET
+    validate_certs: no
+    force_basic_auth: yes
+  register: quay_reg_status
+  run_once: true
+
+- name: Setup DB
+  local_action:
+    module: uri
+    url: "{{ quay_config_url }}/api/v1/superuser/setupdb"
+    method: GET
+    user: quayconfig
+    password: "{{ quay_config_pass }}"
+    validate_certs: no
+    force_basic_auth: yes
+  when: quay_reg_status.json.status == "setup-db"
+  run_once: true
+
+- name: Check config status - should return setup-db now
+  local_action:
+    module: uri
+    url: "{{ quay_config_url }}/api/v1/superuser/registrystatus"
+    user: quayconfig
+    password: "{{ quay_config_pass }}"
+    method: GET
+    validate_certs: no
+    force_basic_auth: yes
+  register: quay_reg_status
+  run_once: true
+
+- name: Create superuser
+  local_action:
+    module: uri
+    url: "{{ quay_config_url }}/api/v1/superuser/config/createsuperuser"
+    method: POST
+    user: quayconfig
+    password: "{{ quay_config_pass }}"
+    validate_certs: no
+    force_basic_auth: yes
+    body_format: json
+    body: >-
+      {
+        "username": "{{ quay_superuser }}",
+        "password": "{{ quay_superuser_password }}",
+        "email": "{{ quay_superuser_email }}" 
+      }
+  when: quay_reg_status.json.status == "create-superuser"
+  run_once: true
+
+- name: Check registry config status - should be config now
+  local_action:
+    module: uri
+    url: "{{ quay_config_url }}/api/v1/superuser/registrystatus"
+    user: quayconfig
+    password: "{{ quay_config_pass }}"
+    validate_certs: no
+    method: GET
+    force_basic_auth: yes
+  register: quay_reg_status
+  run_once: true
+
+- name: Configure Clair scanner
+  block:
+  - name: Check scanner keys
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/keys"
+      method: GET
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      force_basic_auth: yes
+    register: clair_config_status
+
+  - name: Create Clair scanner key
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/keys"
+      method: POST
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      force_basic_auth: yes
+      body_format: json
+      body: >-
+        {
+        "name":"security_scanner Service Key",
+        "service":"security_scanner",
+        "expiration": null,
+        "notes":"Created during setup"
+        }
+    when: clair_config_status.json["keys"] | length == 0
+    register: clair_key
+
+  - name: Keep a copy of Clair Keys
+    copy:
+      content: "{{ clair_key.json }}"
+      dest: "{{ clair_config_path }}/clair_keys.json"
+    when: clair_config_status.json["keys"] | length == 0
+  when: quay_reg_status.json.status == "config"
+  run_once: true
+
+
+- name: Configure SSL cert
+  block:
+  - name: Check SSL cert
+    local_action: 
+      module: stat 
+      path: "{{ quay_ssl_cert }}"
+    register: ssl_cert
+
+  - name: Assert SSL cert present
+    assert:
+      that: 
+      - ssl_cert.stat.exists
+
+  - name: Check if Cert is uploaded
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/config/file/ssl.cert"
+      method: GET
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      force_basic_auth: yes
+    register: ssl_cert_api_status
+
+  - name: Upload SSL Cert
+    local_action:
+      shell curl -k -u quayconfig:{{ quay_config_pass }} \
+         -F 'file=@{{ quay_ssl_cert }}' \
+         {{ quay_config_url }}/api/v1/superuser/config/file/ssl.cert
+    when: not ssl_cert_api_status.json.exists
+
+  when: 
+  - quay_reg_status.json.status == "config" 
+  - quay_ssl_cert is defined
+  run_once: true
+
+- name: Copy ssl.cert to remote host
+  copy:
+    src: "{{ quay_ssl_cert }}"
+    dest: "{{ quay_config_path }}/config/ssl.cert"
+
+
+- name: Configure SSL key
+  block:
+  - name: Check SSL key
+    local_action: 
+      module: stat 
+      path: "{{ quay_ssl_key }}"
+    register: ssl_key
+
+  - name: Assert SSL key present
+    assert:
+      that: 
+      - ssl_key.stat.exists
+
+  - name: Check if Key is uploaded
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/config/file/ssl.key"
+      method: GET
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      force_basic_auth: yes
+    register: ssl_key_api_status
+
+  - name: Upload SSL Key
+    local_action: |
+      shell curl -k -u quayconfig:{{ quay_config_pass }} \
+       -F 'file=@{{ quay_ssl_key }}' \
+       {{ quay_config_url }}/api/v1/superuser/config/file/ssl.key
+    when: not ssl_key_api_status.json.exists
+    register: ssl_key_upload
+
+  when: 
+  - quay_reg_status.json.status == "config" 
+  - quay_ssl_key is defined
+  run_once: true
+
+- name: Copy ssl.key to remote host
+  copy:
+    src: "{{ quay_ssl_key }}"
+    dest: "{{ quay_config_path }}/config/ssl.key"
+
+
+
+- name: Configure CA bundle
+  block:
+  - name: Check CA bundle file
+    local_action: 
+      module: stat 
+      path: "{{ quay_ca_bundle }}"
+    register: cabundle
+
+  - name: Assert CA bundle key present
+    assert:
+      that: 
+      - cabundle.stat.exists
+
+  - name: Upload CA bunlde
+    local_action: |
+      shell curl -k -u quayconfig:{{ quay_config_pass }} \
+       -F 'file=@{{ quay_ca_bundle }}' \
+       {{ quay_config_url }}/api/v1/superuser/customcerts/ca.crt
+
+  - name: Copy CABundle to remote host
+    copy:
+      src: "{{ quay_ca_bundle }}"
+      dest: "{{ quay_config_path }}/config/ca.crt"
+  when: 
+  - quay_ca_bundle is defined
+  - quay_reg_status.json.status == "config" 
+
+
+
+- name: Prepare config
+  block:
+  - name: Create tmp folder
+    file:
+      state: directory
+      path: "{{ playbook_dir }}/.tmp/"
+
+  - name: Check current config
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/config"
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      method: GET
+      force_basic_auth: yes
+    register: fetched_config
+
+  - name: Copy config to remote host
+    template:
+      src: quay-config.yaml.j2
+      dest: "{{ quay_config_path }}/config/config.yaml"
+
+  - name: Fetch the rendered file locally
+    fetch:
+      src: "{{ quay_config_path }}/config/config.yaml"
+      dest: "{{ playbook_dir }}/.tmp/"
+      flat: yes
+
+  - name: Read file
+    include_vars:
+      file: "{{ playbook_dir }}/.tmp/config.yaml"
+      name: config
+
+  - name: Prepare payload for validation
+    set_fact:
+      payload_structure: 
+      - { key: 'config', value: '{{ config }}'}
+      - { key: 'password', value: ""}
+
+  - name: Create payload for validation
+    set_fact:
+      payload: '{{ payload | default({}) | combine({item.key: item.value}) }}'
+    loop: '{{ payload_structure }}'
+
+  - name: Validate configuration
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/config/validate/{{ item }}"
+      method: POST
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      validate_certs: no
+      force_basic_auth: yes
+      headers:
+        Content-Type: "application/json"
+      body: "{{ payload | to_json }}"
+      body_format: json
+    loop: 
+    - registry-storage
+    - redis
+    - time-machine
+    - access
+    - ssl
+    - security-scanner
+
+  - name: Push new config
+    local_action:
+      module: uri
+      url: "{{ quay_config_url }}/api/v1/superuser/config"
+      method: PUT
+      user: quayconfig
+      password: "{{ quay_config_pass }}"
+      force_basic_auth: yes
+      validate_certs: no
+      body_format: json
+      body: "{{ payload | to_json }}"
+  when: quay_reg_status.json.status == "config"
+  run_once: true
+
+- name: Copy config to remote host
+  template:
+    src: quay-config.yaml.j2
+    dest: "{{ quay_config_path }}/config/config.yaml"
+
+
+
+- name: Backup quay config
+  block:
+  - name: Backup Quay config
+    archive:
+      path:
+      - "{{ quay_config_path }}/config/*"
+      dest: "{{ quay_config_path }}/config/quay-config.tar.gz"
+      format: gz
+      
+  - name: Fetch the backup file locally
+    fetch:
+      src: "{{ quay_config_path }}/config/quay-config.tar.gz"
+      dest: "{{ playbook_dir }}/.tmp/"
+      flat: yes
+  run_once: true
+
+- name: Stop Quay config pod
+  delegate_to: "{{ groups['quay_config'][0] }}"
+  run_once: true
+  containers.podman.podman_container:
+    state: absent
+    name: "quay-config"

@@ -1,0 +1,4 @@
+ansible.log
+playbooks/.tmp/*
+playbooks/files/*
+vaults/quay_auth.vault

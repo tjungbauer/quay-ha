@@ -1,0 +1,16 @@
+# This file is managed by ansible
+#
+# WARNING: Manual changes will be overwritten on the next ansible run!
+#
+
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+{% if etc_hosts_add_extra_entries %}
+# extra entries 
+{% if etc_hosts_extra_entries is defined %}
+{% for host in etc_hosts_extra_entries %}
+{{ host.ip }}    {{ host.hostnames }}
+{% endfor %}
+{% endif %}
+{% endif %}

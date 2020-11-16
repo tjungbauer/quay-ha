@@ -1,0 +1,83 @@
+AUTHENTICATION_TYPE: Database
+BITTORRENT_FILENAME_PEPPER: '{{ fetched_config.json["config"]["BITTORRENT_FILENAME_PEPPER"] | default(0) }}'
+BUILDLOGS_REDIS:
+  host: "{{ quay_redis_host }}"
+  port: {{ quay_redis_port }}
+DATABASE_SECRET_KEY: '{{ fetched_config.json["config"]["DATABASE_SECRET_KEY"] | default(0) }}'
+DB_URI: "postgresql://{{ quay_db_user }}:{{ quay_db_pass }}@{{ quay_db_host }}:{{ quay_db_port | default('5432') }}/{{ quay_db }}"
+DEFAULT_TAG_EXPIRATION: 2w
+{% if quay_datastore == "rados" %}
+DISTRIBUTED_STORAGE_CONFIG:
+  default:
+  - RadosGWStorage
+  - access_key: {{ quay_rados_access_key }}
+    bucket_name: {{ quay_rados_bucket_name }}
+    hostname: {{ quay_rados_hostname }}
+    is_secure: {{ quay_rados_is_secure }}
+    port: '{{ quay_rados_port }}'
+    secret_key: {{ quay_rados_secret_key }}
+    storage_path: {{ quay_rados_storage_path }}
+{% else %}
+DISTRIBUTED_STORAGE_CONFIG:
+  default:
+  - LocalStorage
+  - storage_path: {{ quay_local_storage_path }}/registry
+{% endif %}
+DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS: []
+DISTRIBUTED_STORAGE_PREFERENCE:
+- default
+ENTERPRISE_LOGO_URL: /static/img/quay-horizontal-color.svg
+FEATURE_ACI_CONVERSION: false
+FEATURE_ANONYMOUS_ACCESS: true
+FEATURE_APP_REGISTRY: false
+FEATURE_APP_SPECIFIC_TOKENS: true
+FEATURE_BUILD_SUPPORT: false
+FEATURE_CHANGE_TAG_EXPIRATION: true
+FEATURE_DIRECT_LOGIN: true
+FEATURE_MAILING: false
+FEATURE_PARTIAL_USER_AUTOCOMPLETE: true
+FEATURE_REPO_MIRROR: true
+FEATURE_REQUIRE_TEAM_INVITE: true
+FEATURE_RESTRICTED_V1_PUSH: true
+FEATURE_SECURITY_NOTIFICATIONS: true
+FEATURE_SECURITY_SCANNER: true
+FEATURE_USERNAME_CONFIRMATION: true
+FEATURE_USER_CREATION: true
+FEATURE_USER_LOG_ACCESS: true
+GITHUB_LOGIN_CONFIG: {}
+GITHUB_TRIGGER_CONFIG: {}
+GITLAB_TRIGGER_KIND: {}
+GPG2_PRIVATE_KEY_FILENAME: signing-private.gpg
+GPG2_PUBLIC_KEY_FILENAME: signing-public.gpg
+LOG_ARCHIVE_LOCATION: default
+MAIL_DEFAULT_SENDER: support@quay.io
+MAIL_PORT: 587
+MAIL_USE_TLS: true
+PREFERRED_URL_SCHEME: https
+REGISTRY_TITLE: Red Hat Quay
+REGISTRY_TITLE_SHORT: Red Hat Quay
+REPO_MIRROR_SERVER_HOSTNAME: null
+REPO_MIRROR_TLS_VERIFY: true
+SECRET_KEY: '{{ fetched_config.json["config"]["SECRET_KEY"] | default(0) }}'
+SECURITY_SCANNER_ENDPOINT: "{{ clair_url }}"
+SECURITY_SCANNER_ISSUER_NAME: security_scanner
+SERVER_HOSTNAME: {{ quay_hostname }}
+
+SETUP_COMPLETE: true
+SIGNING_ENGINE: gpg2
+TAG_EXPIRATION_OPTIONS:
+- 0s
+- 1d
+- 1w
+- 2w
+- 4w
+TEAM_RESYNC_STALE_TIME: 60m
+TESTING: false
+USERFILES_LOCATION: default
+USERFILES_PATH: userfiles/
+USER_EVENTS_REDIS:
+  host: "{{ quay_redis_host }}"
+  port: {{ quay_redis_port }}
+USE_CDN: false
+V3_UPGRADE_MODE: complete
+

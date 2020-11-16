@@ -1,0 +1,43 @@
+---
+- name: Prepare node
+  gather_facts: yes
+  hosts: etcd
+
+  tasks:
+    - name: Enable EPEL
+      dnf:
+        name: 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm'
+        state: present
+        disable_gpg_check: yes
+      when: not use_local_files|bool
+      tags:
+        - packages
+ 
+    - name: Install EPEL package if repository is enabled
+      package:
+        name:
+          - epel-release
+        state: present
+      when: not use_local_files|bool
+      tags:
+        - packages
+
+    - name: Install base packages for your convinience
+      package:
+        name:
+          - vim
+          - wget
+          - jq
+        state: present
+      tags:
+        - packages
+
+
+- name: Deploy ETCD cluster
+  gather_facts: yes
+  hosts:
+    - etcd
+  vars_files:
+    - ../vaults/quay_auth.vault
+  roles:
+    - deploy_etcd

@@ -1,0 +1,140 @@
+# [Local Member]
+# Human-readable name for this member.
+ETCD_NAME="{{ansible_fqdn}}"
+
+# Path to the data directory.
+ETCD_DATA_DIR="{{etcd_cluster_data_dir}}"
+
+# Number of committed transactions to trigger a snapshot to disk.
+#ETCD_SNAPSHOT_COUNTER="10000"
+
+# Time (in milliseconds) of a heartbeat interval.
+#ETCD_HEARTBEAT_INTERVAL="100"
+
+# Time (in milliseconds) for an election to timeout.
+#ETCD_ELECTION_TIMEOUT="1000"
+
+{% if etcd_iface_public == 'all' %}
+{% set client_endpoints = [ etcd_listen_public ] %}
+{% else %}
+{% set client_endpoints = [ etcd_listen_public, '127.0.0.1' ] %}
+{% endif %}
+# List of comma separated URLs to listen on for client traffic.
+ETCD_LISTEN_CLIENT_URLS="{{ client_endpoints | map('regex_replace', '^(.+)$', etcd_scheme ~ '\\1' ~ ':' ~ etcd_port_client) | join(',') }}"
+
+# Accept etcd V2 client requests
+ETCD_ENABLE_V2={{etcd_enable_v2}}
+
+# Maximum number of snapshot files to retain (0 is unlimited).
+#ETCD_MAX_SNAPSHOTS="5"
+
+# Maximum number of wal files to retain (0 is unlimited).
+#ETCD_MAX_WALS="5"
+
+# Comma-separated white list of origins for CORS (cross-origin resource sharing).
+#ETCD_CORS=""
+#
+# [Cluster settings]
+{% if inventory_hostname in groups[etcd_master_group_name] %}
+# List of comma separated URLs to listen on for peer traffic.
+ETCD_LISTEN_PEER_URLS="{{etcd_scheme}}{{etcd_listen_cluster}}:{{etcd_port_peer}}"
+
+# List of this member's client URLs to advertise to the public.
+# The URLs needed to be a comma-separated list.
+ETCD_ADVERTISE_CLIENT_URLS="{{etcd_scheme}}{{etcd_address_public}}:{{etcd_port_client}}"
+
+# List of this member's peer URLs to advertise to the rest of the cluster.
+# The URLs needed to be a comma-separated list.
+ETCD_INITIAL_ADVERTISE_PEER_URLS="{{etcd_scheme}}{{etcd_address_cluster}}:{{etcd_port_peer}}"
+{% endif %}
+
+# Initial cluster configuration for bootstrapping.
+ETCD_INITIAL_CLUSTER="{{etcd_cluster}}"
+
+# Initial cluster state ('new' or 'existing').
+ETCD_INITIAL_CLUSTER_STATE="new"
+
+# Initial cluster token for the etcd cluster during bootstrap.
+ETCD_INITIAL_CLUSTER_TOKEN="{{etcd_initial_cluster_token}}"
+
+# if you use different ETCD_NAME (e.g. test), set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
+#ETCD_DISCOVERY=""
+#ETCD_DISCOVERY_SRV=""
+#ETCD_DISCOVERY_FALLBACK="proxy"
+#ETCD_DISCOVERY_PROXY=""
+
+#[Proxy Settings]
+{% if inventory_hostname not in groups[etcd_master_group_name] %}
+
+# Valid values include 'on', 'readonly', 'off'
+#ETCD_PROXY="off"
+
+# Time (in milliseconds) an endpoint will be held in a failed state.
+#ETCD_PROXY_FAILURE_WAIT="5000"
+
+# Time (in milliseconds) of the endpoints refresh interval.
+#ETCD_PROXY_REFRESH_INTERVAL="30000"
+
+# Time (in milliseconds) for a dial to timeout.
+#ETCD_PROXY_DIAL_TIMEOUT="1000"
+
+# Time (in milliseconds) for a write to timeout.
+#ETCD_PROXY_WRITE_TIMEOUT="5000"
+
+# Time (in milliseconds) for a read to timeout.
+#ETCD_PROXY_READ_TIMEOUT="0"
+{% endif %}
+
+#[Security Settings]
+{% if etcd_secure %}
+# Path to the client server TLS cert file.
+ETCD_CERT_FILE="{{ etcd_cluster_pki_dir }}/{{etcd_ssl[0].dst}}"
+
+# Path to the client server TLS key file.
+ETCD_KEY_FILE="{{ etcd_cluster_pki_dir }}/{{etcd_ssl[1].dst}}"
+
+# Enable client cert authentication.
+ETCD_CLIENT_CERT_AUTH="true"
+
+# Path to the client server TLS trusted CA cert file.
+ETCD_TRUSTED_CA_FILE="{{ etcd_cluster_pki_dir }}/{{etcd_ssl[2].dst}}"
+
+# Client TLS using generated certificates
+ETCD_AUTO_TLS="false"
+
+# Path to the peer server TLS cert file.
+ETCD_PEER_CERT_FILE="{{ etcd_cluster_pki_dir }}/{{etcd_ssl[0].dst}}"
+
+# Path to the peer server TLS key file.
+ETCD_PEER_KEY_FILE="{{ etcd_cluster_pki_dir }}/{{etcd_ssl[1].dst}}"
+
+# Enable peer client cert authentication."
+ETCD_PEER_CLIENT_CERT_AUTH="true"
+
+# Path to the peer server TLS trusted CA cert file.
+ETCD_PEER_TRUSTED_CA_FILE="{{ etcd_cluster_pki_dir }}/{{etcd_ssl[2].dst}}"
+
+# Peer TLS using generated certificates.
+ETCD_PEER_AUTO_TLS="false"
+{% endif %}
+
+#[Logging Settings]
+# Enable debug-level logging for etcd.
+#ETCD_DEBUG="true"
+
+# examples for -log-package-levels etcdserver=WARNING,security=DEBUG
+#ETCD_LOG_PACKAGE_LEVELS="etcdserver=DEBUG"
+
+# Force to create a new one member cluster.
+#ETCD_FORCE_NEW_CLUSTER="false"
+#
+#[Version]
+#ETCD_VERSION="false"
+#ETCD_AUTO_COMPACTION_RETENTION="0"
+#
+#[Profiling]
+#ETCD_ENABLE_PPROF="false"
+#ETCD_METRICS="basic"
+#
+#[Auth]
+#ETCD_AUTH_TOKEN="simple"

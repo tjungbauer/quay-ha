@@ -1,0 +1,70 @@
+- name: Connect to Patroni RestAPI
+  uri:
+    url: http://localhost:8008/cluster
+    method: GET
+    return_content: yes
+    status_code: 200
+    body_format: json
+  register: data
+  run_once: true
+
+- name: DEBUG - analyze returned Patroni json and find current leader
+  debug:
+    msg: "{{ data.json.members|json_query(query) }}"
+  register: leader
+  vars:
+    role: "leader"
+    query: "[?role=='{{ role }}'].name"
+  run_once: true
+
+# leader.msg is return as list, but there should be only one element ... so [0] should work
+- name: Set current DB leader
+  set_fact:
+    leader_node: "{{ leader.msg[0] }}"
+  run_once: true
+
+- name: "Delegated - Create a new database {{ quay_db }}"
+  delegate_to: "{{ leader_node }}"
+  postgresql_db:
+    name: "{{ clair_db }}"
+    state: present
+  run_once: true
+
+- name: "Delegated - Create {{ clair_db_user }} user"
+  delegate_to: "{{ leader_node }}"
+  postgresql_user:
+    db: "{{ clair_db }}"
+    name: "{{ clair_db_user }}"
+    password: "{{ clair_db_pass }}"
+    expires: "infinity"
+  run_once: true
+
+- name: Copy EXAMPLE Clair config to remote
+  template:
+    src: clair-config.yaml.j2
+    dest: "{{ clair_config_path }}/config-example.yaml"
+  
+- name: Copy ssl.key to remote host
+  copy:
+    src: "{{ clair_ssl_key }}"
+    dest: "{{ clair_config_path }}/clair.key"
+  
+- name: Copy ssl.cert to remote host
+  copy:
+    src: "{{ clair_ssl_cert }}"
+    dest: "{{ clair_config_path }}/clair.crt"
+
+
+- name: Copy CLAIR systemd file
+  template:
+     src: systemd/clair.service.j2
+     dest: /etc/systemd/system/clair.service
+     owner: root
+     group: root
+     mode: 0644
+
+- name: Start clair service
+  systemd:
+    name: clair.service
+    daemon_reload: yes
+    enabled: yes

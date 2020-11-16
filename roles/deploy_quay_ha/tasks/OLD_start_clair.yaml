@@ -1,0 +1,117 @@
+# Clair keys are generated during the quay config
+# For idempotency reasons, if the playbook runs again once quay is up, quay config will not run again if there is no change to the configuration, hence Clair keys won't be regenerated 
+# However, templating of Clair config depends on these keys and in order to avoid failure of Clair playbooks, Clair keys are loaded from previous run (in the initial run, they are saved after are generated)
+
+- name: Connect to Patroni RestAPI
+  uri:
+    url: http://localhost:8008/cluster
+    method: GET
+    return_content: yes
+    status_code: 200
+    body_format: json
+  register: data
+  run_once: true
+
+- name: DEBUG - analyze returned Patroni json and find current leader
+  debug:
+    msg: "{{ data.json.members|json_query(query) }}"
+  register: leader
+  vars:
+    role: "leader"
+    query: "[?role=='{{ role }}'].name"
+  run_once: true
+
+# leader.msg is return as list, but there should be only one element ... so [0] should work
+- name: Set current DB leader
+  set_fact:
+    leader_node: "{{ leader.msg[0] }}"
+  run_once: true
+
+- name: "Delegated - Create a new database {{ quay_db }}"
+  delegate_to: "{{ leader_node }}"
+  postgresql_db:
+    name: "{{ clair_db }}"
+    state: present
+  run_once: true
+
+- name: "Delegated - Create {{ clair_db_user }} user"
+  delegate_to: "{{ leader_node }}"
+  postgresql_user:
+    db: "{{ clair_db }}"
+    name: "{{ clair_db_user }}"
+    password: "{{ clair_db_pass }}"
+    expires: "infinity"
+  run_once: true
+
+- name: Get Clair config
+  block:
+  - name: Fetch Clair keys
+    fetch:
+      src: "{{ clair_config_path }}/clair_keys.json"
+      dest: "{{ playbook_dir }}/.tmp/"
+      flat: yes
+
+  - name: Load previous Clair keys
+    include_vars:
+      file: "{{ playbook_dir }}/.tmp/clair_keys.json"
+      name: clair_key_json
+  ignore_errors: true
+  run_once: true
+
+- name: Set clair_key_json variable
+  set_fact:
+    key_value: "clair_key_json={{ clair_key.json }}"
+  when: clair_key.json is defined
+
+- name: Check if Clair Keys are defined
+  assert:
+    that:
+    - clair_key_json is defined
+    fail_msg: "Clair Keys haven't been generated, nor could be loaded from previous run"
+
+- name: Copy Clair key to remote
+  copy:
+    content: "{{ clair_key_json.private_key }}"
+    dest: "{{ clair_config_path }}/security_scanner.pem"
+    
+- name: Copy Clair config to remote
+  template:
+    src: clair-config.yaml.j2
+    dest: "{{ clair_config_path }}/config.yaml"
+
+- name: Copy ssl.key to remote host
+  copy:
+    src: "{{ clair_ssl_key }}"
+    dest: "{{ clair_config_path }}/clair.key"
+
+- name: Copy ssl.cert to remote host
+  copy:
+    src: "{{ clair_ssl_cert }}"
+    dest: "{{ clair_config_path }}/clair.crt"
+
+- name: Start Clair Container - This may take a while when the image must be pulled first
+  containers.podman.podman_container:
+    detach: yes
+    name: "clair"
+    privileged: no
+    publish:
+      - "6060:6060"
+      - "6061:6061"
+    image: "quay.io/redhat/clair-jwt:v3.3.1"
+    volume:
+      - "{{ clair_config_path }}:/clair/config:Z"
+
+- name: Copy CLAIR systemd file
+  template:
+     src: systemd/clair.service.j2
+     dest: /etc/systemd/system/clair.service
+     owner: root
+     group: root
+     mode: 0644
+
+- name: Start clair service
+  systemd:
+    name: clair.service
+    state: restarted
+    daemon_reload: yes
+    enabled: yes

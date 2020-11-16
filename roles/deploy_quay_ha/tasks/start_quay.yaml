@@ -1,0 +1,27 @@
+#- name: Start Quay Container - This may take a while when the image must be pulled first
+#  containers.podman.podman_container:
+#    detach: yes
+#    name: "quay"
+#    privileged: yes
+#    sysctl: { net.core.somaxconn: 4096 }
+#    publish:
+#      - "80:8080"
+#      - "443:8443"
+#    image: "quay.io/redhat/quay:{{ quay_version }}"
+#    volume:
+#      - "{{ quay_config_path }}/config:/conf/stack:Z"
+#      - "{{ quay_config_path }}/storage:/datastorage:Z"
+
+- name: Copy QUAY systemd file
+  template:
+    src: systemd/quay.service.j2
+    dest: /etc/systemd/system/quay.service
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Start quay service
+  systemd:
+    name: quay.service
+    daemon_reload: yes
+    enabled: yes

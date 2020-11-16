@@ -1,0 +1,20 @@
+### Install Packages
+- name: Check for Postgres repo
+  block:
+  - name: Install latest Postgres repo
+    dnf:
+      name: "{{ psql_repo }}"
+      state: present
+      disable_gpg_check: yes
+
+  - name: Enable PostgreSQL and disable default postgres(10)
+    shell:
+      cmd: yum-config-manager --enable pgdg12; dnf -qy module disable postgresql
+  when: psql_custom|bool
+
+- name: Install PostgreSQL and supporting packages
+  package:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+  with_items:
+    - "{{ psql_packages }}"

@@ -1,0 +1,109 @@
+### Patroni
+- name: Copy python3-certifi rpm
+  copy:
+    src: "python3-certifi-2018.10.15-7.el8.noarch.rpm"
+    dest: /root
+    owner: root
+    group: root
+    mode: '0644'
+  when: use_local_files|bool
+
+- name: "Install Local RPMs when EPEL is not allowed"
+  yum:
+    name: "/root/python3-certifi-2018.10.15-7.el8.noarch.rpm"
+    state: present
+    disable_gpg_check: yes
+  when: use_local_files|bool
+
+- name: Install patroni from 3rd party
+  dnf:
+    name: "{{ patroni_repo }}"
+    state: present
+    disable_gpg_check: yes
+  when: not psql_custom|bool
+
+- name: Install Patroni from Postgres
+  dnf:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - patroni
+    - "patroni-{{ patroni_dcs }}"
+  when: psql_custom|bool
+
+- name: "Create patroni config directory {{ patroni_config_dir }}"
+  file:
+    path: "{{ patroni_config_dir }}"
+    state: directory
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: 0750
+
+- name: "Create patroni SSL directory"
+  file:
+    path: "{{ patroni_config_dir }}/ssl"
+    state: directory
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: 0755
+
+- name: "Create patroni log directory {{ patroni_log_dir }}"
+  file:
+    path: "{{ patroni_log_dir }}"
+    state: directory
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: 0750
+  when: patroni_log_destination |d('stderr', true) != 'stderr'
+
+- name: Create patroni unit file
+  template:
+    src: systemd/patroni.service.j2
+    dest: /etc/systemd/system/patroni.service
+    owner: root
+    group: root
+    mode: 0644
+  when: not psql_custom|bool
+
+- name: Prepare callback scripts
+  copy:
+    src: "{{ patroni_postgresql_callbacks_dir }}/{{ item.event }}"
+    dest: "{{ item.script }}"
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: 0750
+    backup: "{{ patroni_backup_on_copy }}"
+  with_items:
+    - "{{ patroni_postgresql_callbacks }}"
+  when: not( (item.script is none) or (item.script | trim | length == 0) )
+
+- name: Copy ETCD client certificates
+  copy:
+    src: "{{ item.src }}"
+    dest: "/etc/patroni/ssl//{{ item.dst }}"
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: "{{ item.mode }}"
+  with_items:
+    - "{{ etcd_client_cert }}"
+  when: etcd_secure | bool 
+#  notify:
+#    - restart patroni
+
+
+- name: Create patroni configuration file
+  template:
+    src: patroni.yml.j2
+    dest: "{{ patroni_config_dir }}/{{ patroni_config_file | default('patroni.yml') }}"
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: 0600
+#  notify:
+#    - restart patroni
+
+- name: restart patroni
+  systemd:
+    name: patroni.service
+    state: restarted
+    daemon_reload: yes
+    enabled: yes

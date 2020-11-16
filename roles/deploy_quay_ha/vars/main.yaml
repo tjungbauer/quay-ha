@@ -1,0 +1,29 @@
+---
+######################
+#   Quay Deployment  #
+######################
+quay_db: quaydb
+quay_db_user: quayuser
+quay_config_url: "https://{{ quay_hostname }}:8443"
+#quay_db_port: # Default 5432
+
+######################
+#       Redis        #
+######################
+quay_redis_port: 6379
+
+# Only if local storage, otherwise ignored
+quay_local_storage_path: /datastorage
+
+######################
+#        Clair       #
+######################
+clair_db: clair
+clair_db_user: clair
+
+######################
+# Package Deployment #
+######################
+base_packages:
+  - name: podman
+    state: present

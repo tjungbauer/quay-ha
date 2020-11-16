@@ -1,0 +1,85 @@
+- name: Install ETCD
+  block:
+  - name: Collect facts
+    set_fact:
+      cacheable: yes
+      etcd_listen_public: '{{ "0.0.0.0" if etcd_iface_public == "all" else ansible_default_ipv4.address if etcd_iface_public == "default" else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_public]["ipv4"]["address"] }}'
+      etcd_listen_cluster: '{{ "0.0.0.0" if etcd_iface_cluster == "all" else ansible_default_ipv4.address if etcd_iface_cluster == "default" else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_cluster]["ipv4"]["address"] }}'
+      etcd_address_public: '{{ ansible_fqdn if not etcd_use_ips | bool else ansible_default_ipv4.address if etcd_iface_public is in [ "all", "default" ] else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_public]["ipv4"]["address"] }}'
+      etcd_address_cluster: '{{ ansible_fqdn if not etcd_use_ips | bool else ansible_default_ipv4.address if etcd_iface_cluster is in [ "all", "default" ] else hostvars[inventory_hostname]["ansible_" ~ etcd_iface_cluster]["ipv4"]["address"] }}'
+
+  - name: create etcd group
+    group:
+      name: '{{ etcd_group }}'
+      state: present
+
+  - name: create etcd user
+    user:
+      name: '{{ etcd_user }}'
+      group: '{{ etcd_group }}'
+      home: '{{ etcd_data_dir }}'
+      state: present
+
+  - name: create dirs...
+    file:
+      state: directory
+      path: '{{ item }}'
+      owner: '{{ etcd_user }}'
+      group: '{{ etcd_group }}'
+      mode: 0755
+    with_items:
+      - "{{ etcd_confg_dir }}"
+      - '{{ etcd_cluster_pki_dir }}'
+
+  - name: Copy etcd binaries
+    copy:
+      src: "{{ item }}"
+      dest: /usr/local/bin/
+      owner: root
+      group: root
+      mode: '0755'
+    loop:
+      - etcdctl
+      - etcd
+
+  - name: install keys/certs for etcd
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ etcd_cluster_pki_dir }}/{{ item.dst }}"
+      owner: '{{ etcd_user }}'
+      group: '{{ etcd_group }}'
+      mode: "{{ item.mode }}"
+    with_items:
+      - "{{ etcd_ssl }}"
+    when: etcd_secure | bool and inventory_hostname in groups['etcd']
+
+  - name: install etcd configuration
+    template:
+      src: etcd.conf.j2
+      dest: '{{ etcd_confg_dir }}/etcd.conf'
+      owner: '{{ etcd_user }}'
+      group: '{{ etcd_group }}'
+      mode: 0644
+    notify:
+      - restart etcd masters
+      - restart etcd members
+    when: inventory_hostname in groups['etcd']
+
+  - name: Create etcd systemd service
+    template:
+      src: systemd/etcd.service.j2
+      dest: /etc/systemd/system/etcd.service
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: systemctl daemon-reload
+    systemd:
+      daemon_reload: yes
+
+  - name: launching etcd...
+    service:
+      name: etcd
+      enabled: yes
+      state: started
+
