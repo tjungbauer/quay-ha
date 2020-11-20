@@ -41,6 +41,11 @@
   gather_facts: yes
   hosts:
     - psql
+  vars:
+    proxy_env:
+      http_proxy: "{{ http_proxy }}"
+      https_proxy: "{{ https_proxy }}"
+      no_proxy: "{{ no_proxy }}"
   vars_files:
     - ../vaults/quay_auth.vault
   collections:
