@@ -2,6 +2,10 @@
 base_domain: ispworld.at
 use_local_files: true
 
+http_proxy: ""
+https_proxy: ""
+no_proxy: ""
+
 etc_hosts_add_extra_entries: True
 etc_hosts_extra_entries:
   - ip: 192.168.101.4
@@ -63,7 +67,7 @@ quay_ssl_cert: "{{ playbook_dir }}/files/ssl.cert"
 quay_ssl_key: "{{ playbook_dir }}/files/ssl.key"
 
 # Define ca bundle if any. If not, leave empty
-#quay_ca_bundle: "{{ playbook_dir }}files/ca.crt"
+quay_ca_bundle: ""
 
 ######################
 #       Redis        #
@@ -77,12 +81,14 @@ clair_url: http://192.168.100.1:6060
 clair_db_host: 192.168.100.1
 clair_ssl_cert: "{{ playbook_dir }}/files/ssl.cert"
 clair_ssl_key: "{{ playbook_dir }}/files/ssl.key"
+clair_ca: ""
 
 ######################
 # Patroni Deployment #
 ######################
 db_network: "192.168.100.0/24"
 patroni_etcd_hosts: 192.168.100.4:2379,192.168.100.5:2379,192.168.100.6:2379
+patroni_postgresql_data_dir: "/var/lib/pgsql/12/data"
 
 ######################
 #   etcd settings    #

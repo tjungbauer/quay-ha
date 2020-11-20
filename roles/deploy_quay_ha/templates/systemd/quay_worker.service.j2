@@ -1,10 +1,21 @@
 [Unit]
 Description=Quay Worker
+Wants=network.target
+After=network-online.target
 
 [Service]
+{% if http_proxy %}
+Environment=HTTP_PROXY="{{ http_proxy }}"
+{% endif %}
+{% if https_proxy %}
+Environment=HTTPS_PROXY="{{ https_proxy }}"
+{% endif %}
+{% if no_proxy %}
+Environment=NO_PROXY="{{ no_proxy }}"
+{% endif %}
 Restart=on-failure
 ExecStartPre=/usr/bin/rm -f /%t/%n-pid /%t/%n-cid
-ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid -d --name worker-quay -v {{ quay_config_path }}:/conf/stack:Z quay.io/redhat/quay:{{ quay_version }} repomirror
+ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid -d --name quay-worker -v {{ quay_config_path }}/config:/conf/stack:Z  {% if quay_ca_bundle %} -v {{ quay_ca_bundle }}:/etc/pki/ca-trust/source/anchors/ca.crt {% endif %} quay.io/redhat/quay:{{ quay_version }} repomirror
 ExecStop=/usr/bin/sh -c "/usr/bin/podman rm -f `cat /%t/%n-cid`"
 KillMode=none
 Type=forking

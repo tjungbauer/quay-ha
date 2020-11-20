@@ -2,6 +2,11 @@
 - name: Prepare node
   gather_facts: yes
   hosts: all
+  vars:
+    proxy_env:
+      http_proxy: "{{ http_proxy }}"
+      https_proxy: "{{ https_proxy }}"
+      no_proxy: "{{ no_proxy }}"
 
   tasks:
     - name: Enable EPEL

@@ -2,6 +2,15 @@
 Description=Quay Config
 
 [Service]
+{% if http_proxy %}
+Environment=HTTP_PROXY="{{ http_proxy }}"
+{% endif %}
+{% if https_proxy %}
+Environment=HTTPS_PROXY="{{ https_proxy }}"
+{% endif %}
+{% if no_proxy %}
+Environment=NO_PROXY="{{ no_proxy }}"
+{% endif %}
 Restart=on-failure
 ExecStartPre=/usr/bin/rm -f /%t/%n-pid /%t/%n-cid
 ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid -d --name quay-config --privileged=true -p 8443:8443 quay.io/redhat/quay:{{ quay_version }} config {{ quay_config_pass }}

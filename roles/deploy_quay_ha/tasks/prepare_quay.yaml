@@ -73,11 +73,14 @@
 - name: Login to quay.io - WORKAROUND
   shell:
     cmd: podman login -u "redhat+quay" -p "{{ quayio_pass }}" quay.io
+  environment: "{{ proxy_env }}"
 
 - name: Pull Quay - This may take a while
   shell:
     cmd: podman pull quay.io/redhat/quay:{{ quay_version }}
+  environment: "{{ proxy_env }}"
 
 - name: Pull Clair - This may take a while
   shell: 
     cmd: podman pull quay.io/redhat/clair-jwt:{{ clair_version }}
+  environment: "{{ proxy_env }}"

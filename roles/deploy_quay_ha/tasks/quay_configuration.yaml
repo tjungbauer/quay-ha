@@ -1,17 +1,17 @@
-- name: Start Quay Configuration Container
-  delegate_to: "{{ groups['quay_config'][0] }}"
-  run_once: true
-  containers.podman.podman_container:
-    detach: yes
-    #force_restart: yes
-    state: started
-    name: "quay-config"
-    privileged: yes
-    publish:
-      - "8443:8443"
-    image: "quay.io/redhat/quay:{{ quay_version }}"
-    command: "config {{ quay_config_pass }}"
-  register: quay_config_started
+#- name: Start Quay Configuration Container
+#  delegate_to: "{{ groups['quay_config'][0] }}"
+#  run_once: true
+#  containers.podman.podman_container:
+#    detach: yes
+#    #force_restart: yes
+#    state: started
+#    name: "quay-config"
+#    privileged: yes
+#    publish:
+#      - "8443:8443"
+#    image: "quay.io/redhat/quay:{{ quay_version }}"
+#    command: "config {{ quay_config_pass }}"
+#  register: quay_config_started
 
 - name: Copy Quay-Config systemd file - but do not let it start during boot
   template:
@@ -25,7 +25,15 @@
   systemd:
     name: quay-config.service
     daemon_reload: yes
-    enabled: yes
+    enabled: no
+
+- name: Make Quay Config is started
+  delegate_to: "{{ groups['quay_config'][0] }}"
+  run_once: tru
+  systemd:
+    state: started
+    name: quay-config.service
+  register: quay_config_started
 
 - name: Wait for Quay config container to start
   wait_for:

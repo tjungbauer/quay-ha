@@ -185,7 +185,7 @@
   retries: 10
   delay: 30
   loop:
-    - "{{ ansible_host }}"
+    - "{{ ansible_hostname }}.{{ base_domain }}"
 
 - name: Remove example connections from .mc/config.json
   shell:

@@ -1,7 +1,18 @@
 [Unit]
 Description=Redis for Quay
+Wants=network.target
+After=network-online.target
 
 [Service]
+{% if http_proxy %}
+Environment=HTTP_PROXY="{{ http_proxy }}"
+{% endif %}
+{% if https_proxy %}
+Environment=HTTPS_PROXY="{{ https_proxy }}"
+{% endif %}
+{% if no_proxy %}
+Environment=NO_PROXY="{{ no_proxy }}"
+{% endif %}
 Restart=on-failure
 ExecStartPre=/usr/bin/rm -f /%t/%n-pid /%t/%n-cid
 ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid -d --name redis -p 6379:6379 --privileged=true -v /var/lib/redis:/var/lib/redis/data:Z registry.access.redhat.com/rhscl/redis-32-rhel7

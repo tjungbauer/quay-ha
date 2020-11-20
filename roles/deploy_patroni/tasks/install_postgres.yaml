@@ -6,10 +6,16 @@
       name: "{{ psql_repo }}"
       state: present
       disable_gpg_check: yes
+    when: not use_local_files|bool
 
   - name: Enable PostgreSQL and disable default postgres(10)
     shell:
-      cmd: yum-config-manager --enable pgdg12; dnf -qy module disable postgresql
+      cmd: yum-config-manager --enable pgdg12
+    when: not use_local_files|bool
+
+  - name: Disable default Postgres repo
+    shell:
+      cmd: dnf -qy module disable postgresql
   when: psql_custom|bool
 
 - name: Install PostgreSQL and supporting packages

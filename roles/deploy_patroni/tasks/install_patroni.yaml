@@ -47,6 +47,14 @@
     group: "{{ patroni_system_group }}"
     mode: 0755
 
+- name: "Create custom Postgres data_dir"
+  file:
+    path: "{{ patroni_postgresql_data_dir }}"
+    state: directory
+    owner: "postgres"
+    group: "postgres"
+    mode: 0700
+
 - name: "Create patroni log directory {{ patroni_log_dir }}"
   file:
     path: "{{ patroni_log_dir }}"

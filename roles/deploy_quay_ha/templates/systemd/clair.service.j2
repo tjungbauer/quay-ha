@@ -1,10 +1,21 @@
 [Unit]
 Description=Clair
+Wants=network.target
+After=network-online.target
 
 [Service]
+{% if http_proxy %}
+Environment=HTTP_PROXY="{{ http_proxy }}"
+{% endif %}
+{% if https_proxy %}
+Environment=HTTPS_PROXY="{{ https_proxy }}"
+{% endif %}
+{% if no_proxy %}
+Environment=NO_PROXY="{{ no_proxy }}"
+{% endif %}
 Restart=on-failure
 ExecStartPre=/usr/bin/rm -f /%t/%n-pid /%t/%n-cid
-ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid -d --name clair -v {{ clair_config_path }}:/clair/config:Z  -p 6060:6060 -p 6061:6061 quay.io/redhat/clair-jwt:v3.3.1
+ExecStart=/usr/bin/podman run --conmon-pidfile /%t/%n-pid --cidfile /%t/%n-cid -d --name clair -v {{ clair_config_path }}:/clair/config:Z  {% if clair_ca %} -v {{ clair_ca }}:/etc/pki/ca-trust/source/anchors/ca.crt:Z {% endif %} -p 6060:6060 -p 6061:6061 quay.io/redhat/clair-jwt:v3.3.1
 ExecStop=/usr/bin/sh -c "/usr/bin/podman rm -f `cat /%t/%n-cid`"
 KillMode=none
 Type=forking
