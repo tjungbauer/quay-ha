@@ -93,6 +93,8 @@ patroni_bootstrap_dcs_postgresql_parameters:
   - { option: "max_wal_senders",           value: "10" }
   - { option: "max_replication_slots",     value: "10" }
   - { option: "wal_keep_segments",         value: "8" }
+  - { option: "archive_command",           value: "{{ patroni_archive_command }}" }
+  - { option: "archive_mode",              value: "on" }
 
 patroni_bootstrap_dcs_postgresql_recovery_conf: []
 #  - { option: "standby_mode",    value: "on" }

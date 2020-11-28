@@ -7,7 +7,6 @@ etcd_cluster_name: etcd.cluster
 etcd_initial_cluster_token: 32255c24-1706-5eb7-8e14-59ccc89e20b5
 etcd_master_group_name: etcd_master
 
-etcd_secure: True
 etcd_port_client: 2379
 etcd_port_peer: 2380
 

@@ -31,6 +31,14 @@
     - "patroni-{{ patroni_dcs }}"
   when: psql_custom|bool
 
+- name: "Create Postgres archive folder {{ patroni_archive_path }}"
+  file:
+    path: "{{ patroni_archive_path }}"
+    state: directory
+    owner: "{{ patroni_system_user }}"
+    group: "{{ patroni_system_group }}"
+    mode: 0700
+
 - name: "Create patroni config directory {{ patroni_config_dir }}"
   file:
     path: "{{ patroni_config_dir }}"

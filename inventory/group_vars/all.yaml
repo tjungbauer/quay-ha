@@ -89,14 +89,16 @@ clair_ca: ""
 db_network: "192.168.100.0/24"
 patroni_etcd_hosts: 192.168.100.4:2379,192.168.100.5:2379,192.168.100.6:2379
 patroni_postgresql_data_dir: "/var/lib/pgsql/12/data"
-
+patroni_etcd_protocol: http
+patroni_archive_path: "/var/lib/pgsql/12/wal/"
+patroni_archive_command: "test ! -f {{ patroni_archive_path }}%f && cp %p {{ patroni_archive_path }}%f"
 ######################
 #   etcd settings    #
 ######################
 etcd_cluster_name: etcd.cluster
 etcd_initial_cluster_token: 32255c24-1706-5eb7-8e14-59ccc89e20b5
 etcd_master_group_name: etcd_master
-etcd_secure: True
+etcd_secure: False
 
 # Certificate for the server to server communication
 etcd_ssl:
